@@ -6,20 +6,103 @@ output:
 ---
 
 
-## Loading and preprocessing the data
+## Loading and preprocessing the data, get summary to determine column formats
+```{r}
+library(plyr)
+library(dplyr)
+library(tidyr)
+unzip("./activity.zip")
+act<-read.csv("./activity.csv",header=TRUE, sep=",")
 
+```
 
 
 ## What is mean total number of steps taken per day?
+```{r, echo=TRUE}
+##sum of steps per day
+act$steps<-as.numeric(as.integer(act$steps))
+act$date<-as.character(act$date)
+act$data<-as.Date(act$date)
+sumstep<-ddply(act, "date", summarise, sum.steps = sum(steps))
+
+```
+
+```{r,sumstep1, echo=TRUE}
+##Frequency of occurrence of total number of steps
+
+hist(sumstep$sum.steps,col="steelblue",main="Total Steps by Day",xlab="Sum of Steps by Day")
+```
 
 
-
+```{r, meanstep1,echo=TRUE}
+##Find the mean and median total steps per day
+mn<-mean(sumstep$sum.steps,na.rm=TRUE)
+print(mn)
+md<-median(sumstep$sum.steps,na.rm=TRUE)
+print(md)
+```
 ## What is the average daily activity pattern?
+```{r,avday, echo=TRUE}
+
+actdayint<-ddply(act,"interval",summarise,mean.steps=mean(steps,na.rm=TRUE))
+
+plot(actdayint$interval,actdayint$mean.steps,type="l",xlab="Interval",ylab="Average Steps",main="Average Daily Pattern")
+```
 
 
+```{r, echo=TRUE}
+## find interval at which most average steps are taken. g=location in dataframe,result echoed= interval label
+g<-which.max(actdayint$mean.steps)
+actdayint$interval[g]
+
+```
 
 ## Imputing missing values
+```{r, echo=TRUE}
+##total number of missing values
+cnt<-is.na(act$steps)
+stepna<-subset(act,cnt==TRUE)
+nrow(stepna)
+```
+
+
+```{r, echo=TRUE}
+##filling in missing values using mean by interval and replot
+
+library(Hmisc)
+act2<-act
+act2 <- ddply(act, "interval", mutate, imputed.steps = (round(impute(steps, mean))))
+act2$imputed.steps<-as.numeric(act2$imputed.steps)
+act2sum<-ddply(act2, "date", summarise, sum.steps = sum(imputed.steps))
+```
+```{r,sumsteps2,echo=TRUE}
+hist(act2sum$sum.steps,col="steelblue",main="Total Steps Taken Each Day",xlab="Sum of Steps")
+```
+```{r, echo=TRUE}
+
+##recalculate mean and median total steps per day
+mn2<-mean(act2sum$sum.steps)
+print(mn2)
+med2<-median(act2sum$sum)
+print(med2)
 
 
 
+```
 ## Are there differences in activity patterns between weekdays and weekends?
+```{r, echo=TRUE}
+##classify data as weekday or weekend by date
+wkact<-act2
+wkact$date<-as.Date(wkact$date)
+weekdays1 <- c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday")
+wkact$wktype <- factor((weekdays(wkact$date) %in% weekdays1), 
+         levels=c(FALSE, TRUE), labels=c("weekend", "weekday")) 
+
+```
+```{r, wkcompare,echo = TRUE,fig.height=8,fig.width=8 }
+##plot based on week type
+library(lattice)
+
+xyplot(imputed.steps ~ interval | wktype, groups = wktype, data = wkact, type = "l",layout=c(1,2),ylab = "Average Steps",main="Average Steps by Interval across all Days")
+
+```
